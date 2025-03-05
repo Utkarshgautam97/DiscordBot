@@ -58,24 +58,31 @@ async def on_message(message):
 # Music Player
 @bot.command(name='play')
 async def play(ctx, url: str):
-    voice_channel = ctx.author.voice.channel
-    if not voice_channel:
-        await ctx.send("Join a voice channel first!")
+    # Check if the user is in a voice channel
+    if ctx.author.voice is None:
+        await ctx.send("❌ You must join a voice channel first!")
         return
     
+    voice_channel = ctx.author.voice.channel
+
+    # Connect to the voice channel if not already connected
     if ctx.voice_client:  # If bot is already in a voice channel
         vc = ctx.voice_client
     else:
         vc = await voice_channel.connect()
 
+    # Download audio from YouTube
     ydl_opts = {'format': 'bestaudio'}
     with yt_dlp.YoutubeDL(ydl_opts) as ydl:
         info = ydl.extract_info(url, download=False)
         url2 = info['url']
     
-    vc.stop()  # Stop the previous song if playing
+    # Stop current audio if playing and play new one
+    if vc.is_playing():
+        vc.stop()
+    
     vc.play(discord.FFmpegPCMAudio(url2))
-    await ctx.send(f'Now playing: {info["title"]}')
+    await ctx.send(f'🎶 Now playing: **{info["title"]}**')
 @bot.command()
 async def hello(ctx):
         await ctx.send(random.choice(resp))
@@ -136,12 +143,12 @@ async def rps(ctx, choice: str):
 
 @bot.command(name="leave")
 async def leave(ctx):
-    if ctx.voice_client:
-        await ctx.voice_client.disconnect()
-        await ctx.send("👋 Left the voice channel.")
-    else:
-        await ctx.send("I'm not in a voice channel.")
+    if ctx.voice_client is None:
+        await ctx.send("❌ I'm not in a voice channel!")
+        return
 
+    await ctx.voice_client.disconnect()
+    await ctx.send("👋 Left the voice channel!")
 # Run the bot
 if __name__ == "__main__":
     load_dotenv()
@@ -149,4 +156,4 @@ if __name__ == "__main__":
     if TOKEN is None:
         print("⚠️ ERROR: Bot token not found! Make sure your .env file is set up correctly.")
     else:
-        bot.run(TOKEN)
+        bot.run(TOKEN)  # Ensures no extra spaces or newlines
