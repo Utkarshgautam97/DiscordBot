@@ -10,6 +10,19 @@ from dotenv import load_dotenv
 import ssl
 import certifi
 ssl_context = ssl.create_default_context(cafile=certifi.where())
+
+import discord
+import ctypes
+import os
+
+opus_path = "/opt/homebrew/lib/libopus.dylib"  # Path to Opus
+
+if not discord.opus.is_loaded():
+    try:
+        discord.opus.load_opus(opus_path)
+        print("✅ Opus loaded successfully!")
+    except Exception as e:
+        print(f"❌ Failed to load Opus: {e}") # Let Discord.py find the default Opus library
 # Bot Configuration
 PREFIX = "!"
 intents = discord.Intents.all()
