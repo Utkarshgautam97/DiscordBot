@@ -2,6 +2,7 @@ import discord
 from discord.ext import commands
 import yt_dlp
 import random
+import google.generativeai as genai
 import asyncio
 import json
 import os
@@ -10,7 +11,6 @@ from dotenv import load_dotenv
 import ssl
 import certifi
 ssl_context = ssl.create_default_context(cafile=certifi.where())
-
 import discord
 import ctypes
 import os
@@ -31,8 +31,17 @@ class MyBot(commands.Bot):
         print(f'✅ Logged in as {self.user}')
 
 bot = MyBot(command_prefix=PREFIX, intents=intents)
+# Load API Key from environment variable
+genai.configure(api_key=os.getenv("GEMINI_TOKEN"))
+def split_message(text, limit=2000):
+    return [text[i:i+limit] for i in range(0, len(text), limit)] #This error happens because Discord messages have a 2000-character limit, but Gemini sometimes returns long responses.
+# Modify your bot to split the response into smaller parts before sending.
+
+# Load API keys
+load_dotenv()
+HUGGINGFACE_API_KEY = os.getenv("HUGGING_TOKEN")
 sad_words = ["sad", "depressed", "unhappy", "angry", "miserable", "upset"]
-resp=["BEEP BOOPP!","Hello I am your bot","I am powered by 99%",]
+resp=["Hello! How can I assist you today?","Hey there! Hope you're having a great day! 😊","Hello I am your bot","Hey! Need any help",]
 # Encouraging responses
 encouragements = [
     "Cheer up! 😊",
@@ -41,6 +50,14 @@ encouragements = [
     "Everything will be okay! ❤️",
     "Keep going, you're amazing! 😇"
 ]
+# 🔥 Roasts List
+roasts = [
+    "You're like a cloud. When you disappear, it’s a beautiful day! 🌞",
+    "Your secrets are safe with me. I never even listen when you tell me them. 🤷‍♂️",
+    "You're proof that even AI can be smarter than humans. 🤖😂",
+    "You bring everyone so much joy… when you leave the room! 🚪",
+]
+
 @bot.event
 async def on_ready():
     print(f'✅ Logged in as {bot.user}')
@@ -100,26 +117,6 @@ async def ban(ctx, member: discord.Member, *, reason=None):
     await ctx.send(f'Banned {member.mention}')
 
 # Fun Commands
-@bot.command(name="reddit_meme")
-async def reddit_meme(ctx):
-    """Fetches a random meme from Reddit."""
-    try:
-        response = requests.get(
-            "https://www.reddit.com/r/memes/random/.json", 
-            headers={"User-Agent": "Mozilla/5.0"}, 
-            verify=certifi.where()  # <-- Ensures proper SSL verification
-        )
-        data = response.json()
-        meme_url = data[0]["data"]["children"][0]["data"]["url"]
-        meme_title = data[0]["data"]["children"][0]["data"]["title"]
-
-        embed = discord.Embed(title=meme_title, color=discord.Color.green())
-        embed.set_image(url=meme_url)
-
-        await ctx.send(embed=embed)
-    except Exception as e:
-        await ctx.send("⚠️ Error fetching meme. Try again later.")
-        print(f"Reddit API error: {e}")
 @bot.command(name='joke')
 async def joke(ctx):
     jokes = [
@@ -149,6 +146,62 @@ async def leave(ctx):
 
     await ctx.voice_client.disconnect()
     await ctx.send("👋 Left the voice channel!")
+@bot.command()
+async def suggest(ctx, *, suggestion: str):
+    with open("suggestions.txt", "a") as file:
+        file.write(f"{ctx.author}: {suggestion}\n")
+    await ctx.send(f"Thanks for your suggestion, {ctx.author.mention}! 💡")
+# 🔥 Roast Command
+@bot.command()
+async def roast(ctx, member: discord.Member = None):  # Allow no mention
+    if member is None:
+        await ctx.send("❌ Please mention a user to roast! Example: `!roast @user`")
+        return
+
+    roast_message = random.choice(roasts)
+    await ctx.send(f"{member.mention}, {roast_message}")
+@bot.command()
+async def chat(ctx, *, message: str):
+    """Chat with Google Gemini AI (1.5 Pro)"""
+    await ctx.send("🤖 Thinking...")
+
+    try:
+        model = genai.GenerativeModel("gemini-1.5-pro")  # ✅ Use the correct model
+        response = model.generate_content([message])  # ✅ Input as a list
+
+        if hasattr(response, "text"):
+            reply = response.text
+        else:
+            reply = "⚠️ No response from AI."
+
+        # Split the message if it's too long
+        for part in split_message(reply):
+            await ctx.send(part)
+
+    except Exception as e:
+        await ctx.send("⚠️ Error communicating with Google Gemini.")
+        print(e)
+@bot.command()
+async def imagine(ctx, *, prompt: str):
+    """Generate an AI image using Stable Diffusion"""
+    await ctx.send(f"🎨 Generating an image for: **{prompt}**...")
+
+    headers = {"Authorization": f"Bearer {HUGGINGFACE_API_KEY}"}
+    payload = {"inputs": prompt}
+
+    response = requests.post(
+        "https://api-inference.huggingface.co/models/CompVis/stable-diffusion-v1-4",
+        headers=headers,
+        json=payload
+    )
+
+    if response.status_code == 200:
+        with open("generated_image.png", "wb") as f:
+            f.write(response.content)
+        await ctx.send(file=discord.File("generated_image.png"))
+    else:
+        await ctx.send("⚠️ Error generating the image. Try again!")
+
 # Run the bot
 if __name__ == "__main__":
     load_dotenv()
